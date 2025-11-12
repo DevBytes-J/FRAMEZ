@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Flicker",
-    "slug": "flicker",
+    "name": "Framez",
+    "slug": "framez",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -21,10 +21,16 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.dev_byte.framez"
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "f4695187-ff0b-4d64-a64b-be654044bbce"
+      }
     }
   }
 }

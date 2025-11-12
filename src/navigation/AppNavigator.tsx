@@ -78,6 +78,7 @@ function AppTabNavigator() {
           ),
         }}
       />
+      
     </Tab.Navigator>
   );
 }

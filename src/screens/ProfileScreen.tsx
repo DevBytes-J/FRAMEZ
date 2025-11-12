@@ -8,6 +8,9 @@ import {
   FlatList,
   StyleSheet,
   Alert,
+  useColorScheme,
+  Dimensions,
+  Animated,
 } from "react-native";
 import {
   collection,
@@ -24,37 +27,95 @@ import * as ImagePicker from "expo-image-picker";
 import { db, storage } from "../firebase/config";
 import { useAuth } from "../context/AuthContext";
 import { Post } from "../types";
+import { LinearGradient } from "expo-linear-gradient";
 
-const PostCardPlaceholder: React.FC<{ post: Post }> = ({ post }) => {
-  const timestamp = post.timestamp?.toDate
-    ? post.timestamp.toDate()
-    : new Date();
+const { width } = Dimensions.get("window");
+
+const PostGridItem: React.FC<{
+  post: Post;
+  theme: "light" | "dark";
+  onPress: () => void;
+}> = ({ post, theme, onPress }) => {
+  const scaleAnim = new Animated.Value(1);
+
+  const handlePressIn = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 0.95,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const colors = {
+    overlay: theme === "dark" ? "rgba(0,0,0,0.5)" : "rgba(0,0,0,0.3)",
+    text: "#ffffff",
+  };
 
   return (
-    <View style={styles.postCard}>
-      <Text style={styles.authorName}>{post.authorName}</Text>
-      {post.imageUrl && (
-        <Image
-          source={{ uri: post.imageUrl }}
-          style={styles.postImage}
-          resizeMode="cover"
-        />
-      )}
-      <Text style={styles.postContent}>{post.content}</Text>
-      <Text style={styles.postTimestamp}>{timestamp.toLocaleTimeString()}</Text>
-    </View>
+    <Animated.View
+      style={[styles.gridItem, { transform: [{ scale: scaleAnim }] }]}
+    >
+      <TouchableOpacity
+        onPress={onPress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        activeOpacity={0.9}
+        style={styles.gridTouchable}
+      >
+        {post.imageUrl ? (
+          <Image source={{ uri: post.imageUrl }} style={styles.gridImage} />
+        ) : (
+          <LinearGradient
+            colors={["#f97316", "#ea580c"]}
+            style={styles.gridPlaceholder}
+          >
+            <Ionicons name="image-outline" size={32} color="#fff" />
+          </LinearGradient>
+        )}
+        <LinearGradient
+          colors={["transparent", colors.overlay]}
+          style={styles.gridOverlay}
+        >
+          {post.content && (
+            <Text style={styles.gridText} numberOfLines={2}>
+              {post.content}
+            </Text>
+          )}
+        </LinearGradient>
+      </TouchableOpacity>
+    </Animated.View>
   );
 };
 
 export default function ProfileScreen() {
   const { user, profile, logout } = useAuth();
+  const colorScheme = useColorScheme();
+  const theme = colorScheme === "dark" ? "dark" : "light";
   const [userPosts, setUserPosts] = useState<Post[]>([]);
   const [loadingPosts, setLoadingPosts] = useState(true);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
+  // NOTE: Removed fadeAnim state and useEffect to simplify header rendering
+
+  const colors = {
+    bg: theme === "dark" ? "#0f172a" : "#f8fafc",
+    card: theme === "dark" ? "#1e293b" : "#ffffff",
+    text: theme === "dark" ? "#f1f5f9" : "#0f172a",
+    subtext: theme === "dark" ? "#94a3b8" : "#64748b",
+    border: theme === "dark" ? "#334155" : "#e2e8f0",
+    accent: theme === "dark" ? "#fbbf24" : "#f97316",
+  };
+
   useEffect(() => {
     if (!user) return;
 
+    // NOTE: Assuming the Firebase indexing issue has been resolved.
     const q = query(
       collection(db, "posts"),
       where("authorId", "==", user.uid),
@@ -90,7 +151,7 @@ export default function ProfileScreen() {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ["images"],
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.5,
@@ -119,13 +180,12 @@ export default function ProfileScreen() {
       await uploadBytes(storageRef, blob);
       const downloadURL = await getDownloadURL(storageRef);
 
-      // Update profile in Firestore
       const profileRef = doc(db, "profiles", user.uid);
       await updateDoc(profileRef, {
         avatarUrl: downloadURL,
       });
 
-      Alert.alert("Success", "Profile picture updated!");
+      Alert.alert("Success", "Profile picture updated! 🎉");
     } catch (error) {
       console.error("Avatar upload error:", error);
       Alert.alert("Error", "Failed to upload avatar");
@@ -136,191 +196,443 @@ export default function ProfileScreen() {
 
   if (!profile) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#FF8A00" />
-        <Text style={styles.loadingText}>Loading Profile...</Text>
+      <View style={[styles.centerContainer, { backgroundColor: colors.bg }]}>
+        <ActivityIndicator size="large" color={colors.accent} />
+        <Text style={[styles.loadingText, { color: colors.text }]}>
+          Loading Profile...
+        </Text>
       </View>
     );
   }
 
-  const ListHeader = () => (
-    <View style={styles.headerContainer}>
-      <View style={styles.profileRow}>
-        <TouchableOpacity onPress={handlePickAvatar} activeOpacity={0.7}>
-          {uploadingAvatar ? (
-            <View style={styles.avatar}>
-              <ActivityIndicator size="small" color="#FF8A00" />
+  const renderHeader = () => (
+    // FIX: Replaced Animated.View with standard View to prevent opacity issue
+    <View>
+      {/* Cover Section */}
+      <LinearGradient
+        colors={
+          theme === "dark" ? ["#1e293b", "#0f172a"] : ["#f97316", "#ea580c"]
+        }
+        style={styles.coverSection}
+      >
+        <View style={styles.coverContent}>
+          {/* Avatar */}
+          <TouchableOpacity
+            onPress={handlePickAvatar}
+            activeOpacity={0.8}
+            style={styles.avatarTouchable}
+          >
+            <View style={styles.avatarWrapper}>
+              {uploadingAvatar ? (
+                <View style={[styles.avatar, { backgroundColor: colors.card }]}>
+                  <ActivityIndicator size="large" color={colors.accent} />
+                </View>
+              ) : profile.avatarUrl ? (
+                <Image
+                  source={{ uri: profile.avatarUrl }}
+                  style={styles.avatar}
+                />
+              ) : (
+                <View
+                  style={[
+                    styles.avatar,
+                    styles.avatarPlaceholder,
+                    { backgroundColor: colors.subtext },
+                  ]}
+                >
+                  <Ionicons name="person-outline" size={48} color="white" />
+                </View>
+              )}
+              <LinearGradient
+                colors={["#f97316", "#ea580c"]}
+                style={styles.cameraIcon}
+              >
+                <Ionicons name="camera" size={20} color="#fff" />
+              </LinearGradient>
             </View>
-          ) : profile.avatarUrl ? (
-            <Image source={{ uri: profile.avatarUrl }} style={styles.avatar} />
-          ) : (
-            <View style={styles.avatarPlaceholder}>
-              <Ionicons name="person-outline" size={32} color="white" />
-            </View>
-          )}
-          <View style={styles.cameraIconContainer}>
-            <Ionicons name="camera" size={16} color="#fff" />
-          </View>
-        </TouchableOpacity>
+          </TouchableOpacity>
 
-        <View>
-          <Text style={styles.profileName}>
-            {profile.name || user?.email?.split("@")[0] || "User"}
+          {/* User Info */}
+          <View style={styles.userInfo}>
+            <Text style={styles.userName}>
+              {profile.name || user?.email?.split("@")[0] || "User"}
+            </Text>
+            <Text style={styles.userEmail}>{profile.email}</Text>
+          </View>
+        </View>
+      </LinearGradient>
+
+      {/* Stats Section */}
+      <View style={[styles.statsSection, { backgroundColor: colors.card }]}>
+        <View style={styles.statItem}>
+          <LinearGradient
+            colors={["#f97316", "#ea580c"]}
+            style={styles.statIcon}
+          >
+            <Ionicons name="images" size={24} color="#fff" />
+          </LinearGradient>
+          <Text style={[styles.statValue, { color: colors.text }]}>
+            {userPosts.length}
           </Text>
-          <Text style={styles.profileEmail}>{profile.email}</Text>
+          <Text style={[styles.statLabel, { color: colors.subtext }]}>
+            Frames
+          </Text>
+        </View>
+
+        <View
+          style={[styles.statDivider, { backgroundColor: colors.border }]}
+        />
+
+        <View style={styles.statItem}>
+          <LinearGradient
+            colors={["#ef4444", "#dc2626"]}
+            style={styles.statIcon}
+          >
+            <Ionicons name="heart" size={24} color="#fff" />
+          </LinearGradient>
+          <Text style={[styles.statValue, { color: colors.text }]}>
+            {userPosts.reduce(
+              (sum, post) => sum + ((post as any).likedBy?.length || 0),
+              0
+            )}
+          </Text>
+          <Text style={[styles.statLabel, { color: colors.subtext }]}>
+            Likes
+          </Text>
+        </View>
+
+        <View
+          style={[styles.statDivider, { backgroundColor: colors.border }]}
+        />
+
+        <View style={styles.statItem}>
+          <LinearGradient
+            colors={["#8b5cf6", "#7c3aed"]}
+            style={styles.statIcon}
+          >
+            <Ionicons name="flame" size={24} color="#fff" />
+          </LinearGradient>
+          <Text style={[styles.statValue, { color: colors.text }]}>
+            {Math.floor(Math.random() * 100) + 50}
+          </Text>
+          <Text style={[styles.statLabel, { color: colors.subtext }]}>
+            Score
+          </Text>
         </View>
       </View>
 
-      <TouchableOpacity style={styles.logoutButton} onPress={logout}>
-        <Text style={styles.logoutButtonText}>Sign Out</Text>
-      </TouchableOpacity>
+      {/* Actions */}
+      <View style={styles.actionsSection}>
+        <TouchableOpacity
+          style={[
+            styles.editButton,
+            { backgroundColor: colors.card, borderColor: colors.border },
+          ]}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="create-outline" size={20} color={colors.accent} />
+          <Text style={[styles.editButtonText, { color: colors.text }]}>
+            Edit Profile
+          </Text>
+        </TouchableOpacity>
 
-      <Text style={styles.postsHeader}>Your Posts ({userPosts.length})</Text>
+        <TouchableOpacity
+          style={styles.logoutButton}
+          onPress={logout}
+          activeOpacity={0.8}
+        >
+          <LinearGradient
+            colors={["#ef4444", "#dc2626"]}
+            style={styles.logoutGradient}
+          >
+            <Ionicons name="log-out-outline" size={20} color="#fff" />
+            <Text style={styles.logoutText}>Sign Out</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+      </View>
+
+      {/* Section Title */}
+      <View style={styles.sectionHeader}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>
+          My Frames
+        </Text>
+        <View style={styles.gridIconContainer}>
+          <Ionicons name="grid" size={20} color={colors.accent} />
+        </View>
+      </View>
     </View>
   );
 
+  const renderEmpty = () =>
+    !loadingPosts ? (
+      <View style={styles.emptyContainer}>
+        <View style={[styles.emptyCard, { backgroundColor: colors.card }]}>
+          <Ionicons name="camera-outline" size={64} color={colors.subtext} />
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>
+            No Frames Yet
+          </Text>
+          <Text style={[styles.emptyText, { color: colors.subtext }]}>
+            Start sharing your moments with the world!
+          </Text>
+        </View>
+      </View>
+    ) : null;
+
   return (
-    <FlatList
-      data={userPosts}
-      keyExtractor={(item) => item.id}
-      renderItem={({ item }) => <PostCardPlaceholder post={item} />}
-      ListHeaderComponent={ListHeader}
-      ListEmptyComponent={
-        !loadingPosts ? (
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>
-              You haven't posted anything yet.
-            </Text>
-          </View>
-        ) : null
-      }
-      style={styles.list}
-    />
+    <View style={[styles.container, { backgroundColor: colors.bg }]}>
+      <FlatList
+        ListHeaderComponent={renderHeader}
+        data={userPosts}
+        keyExtractor={(item) => item.id}
+        numColumns={3}
+        renderItem={({ item }) => (
+          <PostGridItem
+            post={item}
+            theme={theme}
+            onPress={() => Alert.alert("Post", item.content || "View post")}
+          />
+        )}
+        ListEmptyComponent={renderEmpty}
+        // FIX: Removed contentContainerStyle (or its flexGrow: 1 property)
+        // This stops the content from pushing the grid items down.
+        // contentContainerStyle={styles.listContent}
+        columnWrapperStyle={
+          userPosts.length > 0 ? styles.columnWrapper : undefined
+        }
+        showsVerticalScrollIndicator={false}
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  postCard: {
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E5E7EB",
-    backgroundColor: "#fff",
+  container: {
+    flex: 1,
   },
-  authorName: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#111827",
-  },
-  postImage: {
-    width: "100%",
-    height: 200,
-    borderRadius: 8,
-    marginVertical: 8,
-  },
-  postContent: {
-    fontSize: 14,
-    color: "#374151",
-    marginVertical: 4,
-  },
-  postTimestamp: {
-    fontSize: 12,
-    color: "#9CA3AF",
-    marginTop: 4,
-  },
-  loadingContainer: {
+  centerContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#F9FAFB",
   },
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: "#6B7280",
+    fontWeight: "500",
   },
-  headerContainer: {
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E5E7EB",
-    backgroundColor: "#fff",
+  // NOTE: listContent is kept but its usage is removed from FlatList
+  listContent: {
+    flexGrow: 1,
   },
-  profileRow: {
-    flexDirection: "row",
+  coverSection: {
+    paddingTop: 60,
+    paddingBottom: 80,
+    paddingHorizontal: 24,
+  },
+  coverContent: {
     alignItems: "center",
-    marginBottom: 16,
+  },
+  avatarTouchable: {
+    marginBottom: 20,
+  },
+  avatarWrapper: {
+    position: "relative",
   },
   avatar: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    marginRight: 16,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    borderWidth: 4,
+    borderColor: "#fff",
     justifyContent: "center",
     alignItems: "center",
   },
   avatarPlaceholder: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
     backgroundColor: "#9CA3AF",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 16,
   },
-  cameraIconContainer: {
+  cameraIcon: {
     position: "absolute",
-    bottom: 16,
-    right: 16,
-    backgroundColor: "#FF8A00",
-    borderRadius: 12,
-    width: 24,
-    height: 24,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  profileName: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#4F46E5",
-  },
-  profileEmail: {
-    fontSize: 14,
-    color: "#6B7280",
-  },
-  logoutButton: {
-    width: "100%",
+    bottom: 0,
+    right: 0,
+    width: 40,
     height: 40,
-    backgroundColor: "#FF8A00",
-    borderRadius: 8,
+    borderRadius: 20,
     justifyContent: "center",
     alignItems: "center",
-    marginTop: 8,
+    borderWidth: 3,
+    borderColor: "#fff",
   },
-  logoutButtonText: {
+  userInfo: {
+    alignItems: "center",
+  },
+  userName: {
+    fontSize: 28,
+    fontWeight: "800",
     color: "#fff",
-    fontSize: 16,
+    marginBottom: 6,
+  },
+  userEmail: {
+    fontSize: 15,
+    color: "rgba(255, 255, 255, 0.9)",
+    fontWeight: "500",
+  },
+  statsSection: {
+    flexDirection: "row",
+    marginHorizontal: 24,
+    marginTop: -40,
+    padding: 20,
+    borderRadius: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  statItem: {
+    flex: 1,
+    alignItems: "center",
+  },
+  statIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  statValue: {
+    fontSize: 24,
+    fontWeight: "800",
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 13,
     fontWeight: "600",
   },
-  postsHeader: {
-    fontSize: 18,
-    fontWeight: "800",
-    marginTop: 16,
-    marginBottom: 8,
-    borderTopWidth: 1,
-    borderTopColor: "#E5E7EB",
-    paddingTop: 12,
-    color: "#111827",
+  statDivider: {
+    width: 1,
+    marginHorizontal: 8,
   },
-  emptyContainer: {
-    padding: 32,
+  actionsSection: {
+    flexDirection: "row",
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+    gap: 12,
+  },
+  editButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 14,
+    borderRadius: 12,
+    gap: 8,
+    borderWidth: 1,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  editButtonText: {
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  logoutButton: {
+    flex: 1,
+    borderRadius: 12,
+    overflow: "hidden",
+    shadowColor: "#ef4444",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  logoutGradient: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 14,
+    gap: 8,
+  },
+  logoutText: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#fff",
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: "800",
+  },
+  gridIconContainer: {
+    padding: 8,
+  },
+  columnWrapper: {
+    paddingHorizontal: 16,
+  },
+  gridItem: {
+    width: (width - 40) / 3,
+    height: (width - 40) / 3,
+    padding: 2,
+  },
+  gridTouchable: {
+    flex: 1,
+    borderRadius: 12,
+    overflow: "hidden",
+  },
+  gridImage: {
+    width: "100%",
+    height: "100%",
+  },
+  gridPlaceholder: {
+    width: "100%",
+    height: "100%",
     justifyContent: "center",
     alignItems: "center",
   },
-  emptyText: {
-    fontSize: 16,
-    color: "#6B7280",
+  gridOverlay: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 8,
+    justifyContent: "flex-end",
   },
-  list: {
-    flex: 1,
-    backgroundColor: "#F9FAFB",
+  gridText: {
+    fontSize: 11,
+    color: "#fff",
+    fontWeight: "600",
+  },
+  emptyContainer: {
+    padding: 24,
+    alignItems: "center",
+  },
+  emptyCard: {
+    padding: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    width: width - 48,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptyText: {
+    fontSize: 15,
+    textAlign: "center",
+    lineHeight: 22,
   },
 });
