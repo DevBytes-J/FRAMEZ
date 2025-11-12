@@ -1,20 +1,40 @@
-import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import React from "react";
+import { NavigationContainer } from "@react-navigation/native";
+import { createStackNavigator } from "@react-navigation/stack";
+import { AuthProvider, useAuth } from "./src/context/AuthContext";
+import AppTabNavigator from "./src/navigation/AppNavigator";
+import AuthScreen from "./src/screens/AuthScreen";
+import CreatePostScreen from "./src/screens/CreatePostScreen";
 
-export default function App() {
+const RootStack = createStackNavigator();
+
+
+function RootNavigator() {
+  const { user } = useAuth();
+
   return (
-    <View style={styles.container}>
-      <Text>Open up App.tsx to start working on your app!</Text>
-      <StatusBar style="auto" />
-    </View>
+    <RootStack.Navigator screenOptions={{ headerShown: false }}>
+      {user ? (
+        <>
+          <RootStack.Screen name="AppTabs" component={AppTabNavigator} />
+          <RootStack.Screen
+            name="CreatePostModal"
+            component={CreatePostScreen}
+            options={{ presentation: "modal" }}
+          />
+        </>
+      ) : (
+        <RootStack.Screen name="Auth" component={AuthScreen} />
+      )}
+    </RootStack.Navigator>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
+export default function App() {
+  return (
+    <NavigationContainer>
+      <AuthProvider>
+        <RootNavigator />
+      </AuthProvider>
+    </NavigationContainer>
+  );
+}
