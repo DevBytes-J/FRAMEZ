@@ -57,8 +57,8 @@ Try out the live demo here: [Launch Framez on Appetize.io](https://appetize.io/a
 
 ```bash
 # Clone the repository
-git clone [https://github.com/DevBytes-J/Flicker.git](https://github.com/DevBytes-J/Flicker.git)
-cd Flicker
+git clone [https://github.com/DevBytes-J/FRAMEZ.git](https://github.com/DevBytes-J/FRAMEZ.git)
+cd FRAMEZ
 
 # Install dependencies
 npm install
@@ -134,10 +134,7 @@ Push to the branch (git push origin feature/AmazingFeature)
 Open a Pull Request
 
 Please make sure to update tests as appropriate and follow the existing code style.
-
-📸 Screenshots
-Add screenshots of your app here to showcase the UI
-
+```
 📄 License
 MIT License © 2025 DevBytes-J See LICENSE file for details.
 
